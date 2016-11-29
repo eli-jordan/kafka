@@ -68,10 +68,11 @@ class TopicsTest extends KafkaMesosTestCase {
   @Test
   def updateTopic {
     var t: Topic = topics.addTopic("t")
-    topics.updateTopic(t, parseMap("flush.ms=1000"))
+    topics.updateTopic(t, partitions = 2, options = parseMap("flush.ms=1000"))
 
     t = topics.getTopic(t.name)
     assertEquals("flush.ms=1000", formatMap(t.options))
+    assertEquals(2, t.partitions.size())
   }
 
   @Test

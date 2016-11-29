@@ -985,9 +985,9 @@ object Cli {
       val parser = newParser()
       if (add) {
         parser.accepts("broker", "<broker-expr>. Default - *. See below.").withRequiredArg().ofType(classOf[String])
-        parser.accepts("partitions", "partitions count. Default - 1").withRequiredArg().ofType(classOf[Integer])
         parser.accepts("replicas", "replicas count. Default - 1").withRequiredArg().ofType(classOf[Integer])
       }
+      parser.accepts("partitions", "partitions count. Default - 1").withRequiredArg().ofType(classOf[Integer])
       parser.accepts("options", "topic options. Example: flush.ms=60000,retention.ms=6000000").withRequiredArg().ofType(classOf[String])
 
       if (help) {

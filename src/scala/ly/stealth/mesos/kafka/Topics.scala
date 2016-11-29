@@ -126,12 +126,16 @@ class Topics {
     getTopic(name)
   }
 
-  def updateTopic(topic: Topic, options: util.Map[String, String]): Unit = {
+  def updateTopic(topic: Topic, partitions: Int = 1, options: util.Map[String, String]): Unit = {
     val config: Properties = new Properties()
-    for ((k, v) <- options) config.setProperty(k, v)
+    if (options != null)
+      for ((k, v) <- options) config.setProperty(k, v)
 
     val zkClient = newZkClient
-    try { AdminUtils.changeTopicConfig(zkClient, topic.name, config) }
+    try {
+      if (partitions > topic.partitions.size()) AdminUtils.addPartitions(zkClient, topic.name, partitions)
+      AdminUtils.changeTopicConfig(zkClient, topic.name, config)
+    }
     finally { zkClient.close() }
   }
 
