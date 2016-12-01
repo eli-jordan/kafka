@@ -29,6 +29,7 @@ import org.apache.mesos.Protos.Resource.{DiskInfo, ReservationInfo}
 import org.apache.mesos.Protos.Volume.Mode
 import org.apache.mesos.Protos.{Offer, Resource, Value, Volume}
 
+import scala.List
 import scala.collection.JavaConversions._
 import scala.collection.Map
 import scala.util.parsing.json.JSONObject
@@ -186,28 +187,28 @@ class Broker(_id: String = "0") {
         // no available ports to choose from
         if (availablePorts.isEmpty) return -1
 
-        // compute port requirement based on broker config and stickiness
-        var desiredPort: Range = port
+        // compute allowed usable ports based on broker config and offer
+        val usablePorts: List[Range] =
+            if (port == null) availablePorts.toList.sortBy(_.start)
+            else availablePorts.toList.flatMap { range =>
+                if (range.overlap(port) == null) None else Some(range.overlap(port))
+            }.sortBy(_.start)
+
+        // no port usable
+        if (usablePorts.isEmpty) return -1
+
+        // try to stick to the previous port if possible
         if (stickiness.port != null) {
-            desiredPort = new Range(stickiness.port)
-            if (port != null)
-                desiredPort = desiredPort.overlap(port)
+            val preferedPort = new Range(stickiness.port)
+            for (range <- usablePorts) {
+                val found = range.overlap(preferedPort)
+                if (found != null)
+                    return found.start
+            }
         }
 
-        // no port requirement, return first available port
-        val availablePortsSorted = availablePorts.sortBy(r => r.start)
-        if (desiredPort == null)
-            return availablePortsSorted.get(0).start
-
-        // else try to find a matching port
-        for (range <- availablePortsSorted) {
-            val overlap = range.overlap(desiredPort)
-            if (overlap != null)
-                return overlap.start
-        }
-
-        // no matching port
-        -1
+        // else return first usable port
+        return usablePorts.get(0).start
     }
 
     def shouldStart(hostname: String, now: Date = new Date()): Boolean =
