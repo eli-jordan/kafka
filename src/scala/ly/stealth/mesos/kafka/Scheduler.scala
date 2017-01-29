@@ -34,7 +34,7 @@ import scala.collection.mutable
 object Scheduler extends org.apache.mesos.Scheduler {
 
     private val logger: Logger = Logger.getLogger(this.getClass)
-    val version: Version = new Version("0.9.5.2")
+    val version: Version = new Version("0.9.5.5")
 
     val cluster: Cluster = new Cluster()
     private var driver: SchedulerDriver = null
