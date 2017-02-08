@@ -555,7 +555,7 @@ object HttpServer {
         catch { case e: IllegalArgumentException => errors.add("Invalid broker-expr") }
 
       var partitions: Int = 1
-      if (request.getParameter("partitions") != null)
+      if (add && request.getParameter("partitions") != null)
         try { partitions = Integer.parseInt(request.getParameter("partitions")) }
         catch { case e: NumberFormatException => errors.add("Invalid partitions") }
 
@@ -586,7 +586,7 @@ object HttpServer {
       val topicNodes= new ListBuffer[JSONObject]
       for (name <- topicNames) {
         if (add) topics.addTopic(name, topics.fairAssignment(partitions, replicas, brokerIds), options)
-        else topics.updateTopic(topics.getTopic(name), partitions, options)
+        else topics.updateTopic(topics.getTopic(name), options)
 
         topicNodes.add(topics.getTopic(name).toJson)
       }

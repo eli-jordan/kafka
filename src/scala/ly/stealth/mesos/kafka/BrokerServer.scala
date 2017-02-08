@@ -152,12 +152,6 @@ object BrokerServer {
         ))
       }
 
-      // overwrite the log4j.properties file via the log4jOptions uri parameter
-      if (broker.log4jOptions.size > 0) {
-        IO.writeFile(new File(Distro.dir + "/config/log4j.properties"),
-          broker.interpolatedLog4jOptions().map(key => s"${key._1}=${key._2}").mkString("\n"))
-      }
-
       System.setProperty("kafka.logs.dir", "" + new File(Distro.dir, "log"))
       val props: Properties = this.props(broker.interpolatedLog4jOptions(), "log4j.properties")
 
@@ -186,9 +180,6 @@ object BrokerServer {
           dir = file
 
       if (dir == null) throw new IllegalStateException("Kafka distribution dir not found")
-
-      // set the log4j configuration file using the system environment properties
-      System.setProperty("log4j.configurationFile", new File(dir, "config/log4j.properties").getPath)
 
       // create kafka classLoader
       val classpath = new util.ArrayList[URL]()
