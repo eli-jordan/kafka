@@ -382,14 +382,16 @@ class HttpServerTest extends KafkaMesosTestCase {
   def topic_update {
     val topics = registry.cluster.topics
     topics.addTopic("t")
+    assertEquals(1, topics.getTopic("t").partitions.size)
 
     // update topic t
-    val json = sendRequestObj[ListTopicsResponse]("/topic/update", parseMap("topic=t,options=flush.ms\\=1000"))
+    val json = sendRequestObj[ListTopicsResponse]("/topic/update", parseMap("topic=t,partitions=2,options=flush.ms\\=1000"))
     val topicNode = json.topics.head
     assertEquals("t", topicNode.name)
 
     val t = topics.getTopic("t")
     assertEquals("t", t.name)
+    assertEquals(2, t.partitions.size())
     assertEquals("flush.ms=1000", formatMap(t.options))
   }
 

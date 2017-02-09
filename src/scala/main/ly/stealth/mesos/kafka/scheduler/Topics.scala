@@ -95,11 +95,16 @@ class Topics {
     getTopic(name)
   }
 
-  def updateTopic(topic: Topic, options: util.Map[String, String]): Topic = {
+  def updateTopic(topic: Topic, partitions: Int = 1, options: util.Map[String, String]): Topic = {
     val config: Properties = new Properties()
-    for ((k, v) <- options) config.setProperty(k, v)
+    if (options != null)
+      for ((k, v) <- options) config.setProperty(k, v)
 
+    if (partitions > topic.partitions.size()) 
+      AdminUtilsWrapper().addPartitions(topic.name, partitions)
+    
     AdminUtilsWrapper().changeTopicConfig(topic.name, config)
+    
     topic
   }
 
