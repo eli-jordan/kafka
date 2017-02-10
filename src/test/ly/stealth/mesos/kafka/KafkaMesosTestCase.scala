@@ -17,20 +17,27 @@
 package ly.stealth.mesos.kafka
 
 import java.io.{File, FileWriter}
+
 import org.I0Itec.zkclient.{IDefaultNameSpace, ZkClient, ZkServer}
 import org.apache.log4j.{BasicConfigurator, Level, Logger}
 import ly.stealth.mesos.kafka.Cluster.FsStorage
 import net.elodina.mesos.util.{IO, Net, Period, Version}
 import org.junit.{After, Before, Ignore}
+
 import scala.concurrent.duration.Duration
 import scala.collection.JavaConversions._
 import java.util.concurrent.atomic.AtomicBoolean
 import java.util
 import java.util.Date
+
+import kafka.utils.{Json, SystemTime}
 import ly.stealth.mesos.kafka.executor.{BrokerServer, Executor, KafkaServer, LaunchConfig}
 import ly.stealth.mesos.kafka.scheduler._
 import net.elodina.mesos.test.TestSchedulerDriver
+import org.I0Itec.zkclient.exception.ZkMarshallingError
+import org.I0Itec.zkclient.serialize.ZkSerializer
 import org.apache.mesos.Protos.{Status, TaskState}
+import org.apache.zookeeper.data.Stat
 import org.junit.Assert._
 
 @Ignore
@@ -137,10 +144,33 @@ class KafkaMesosTestCase extends net.elodina.mesos.test.MesosTestCase {
     zkServer.start()
 
     val zkClient: ZkClient = zkServer.getZkClient
+    val brokerMetatdata = Map("version" -> 3,
+          "host" -> "localhost",
+          "port" -> 123,
+          "endpoints" -> List("PLAINTEXT://localhost:1234"),
+          "jmx_port" -> 1234,
+          "timestamp" -> SystemTime.milliseconds.toString
+    )
     zkClient.createPersistent("/brokers/ids/0", true)
+    zkClient.setZkSerializer(ZKStringSerializer)
+    zkClient.writeData("/brokers/ids/0", Json.encode(brokerMetatdata))
     zkClient.createPersistent("/config/changes", true)
     zkClient
   }
+
+    object ZKStringSerializer extends ZkSerializer {
+
+        @throws(classOf[ZkMarshallingError])
+        def serialize(data : Object) : Array[Byte] = data.asInstanceOf[String].getBytes("UTF-8")
+
+        @throws(classOf[ZkMarshallingError])
+        def deserialize(bytes : Array[Byte]) : Object = {
+            if (bytes == null)
+                null
+            else
+                new String(bytes, "UTF-8")
+        }
+    }
 
   def stopZkServer() {
     if (zkDir == null) return
