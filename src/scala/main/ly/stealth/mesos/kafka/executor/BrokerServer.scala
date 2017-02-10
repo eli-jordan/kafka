@@ -22,10 +22,12 @@ import java.net.{URL, URLClassLoader}
 import java.util
 import java.util.Properties
 import java.util.concurrent.atomic.AtomicBoolean
-import ly.stealth.mesos.kafka.Util.BindAddress
+
 import ly.stealth.mesos.kafka.Broker
+import ly.stealth.mesos.kafka.Util.BindAddress
 import net.elodina.mesos.util.{IO, Version}
 import org.apache.log4j.Logger
+
 import scala.collection.JavaConversions._
 
 case class LaunchConfig(
@@ -239,6 +241,12 @@ object KafkaServer {
         ))
       }
 
+      // overwrite the log4j.properties file via the log4jOptions uri parameter
+      if (config.log4jOptions.size > 0) {
+        IO.writeFile(new File(Distro.dir + "/config/log4j.properties"),
+          config.interpolatedLog4jOptions.map(key => s"${key._1}=${key._2}").mkString("\n"))
+      }
+
       System.setProperty("kafka.logs.dir", "" + new File(dir, "log"))
       val props: Properties = this.props(config.interpolatedLog4jOptions, "log4j.properties")
 
@@ -262,7 +270,7 @@ object KafkaServer {
 
     private def init(): (File, Loader) = {
       // find kafka dir
-      new File(".").listFiles().toSeq.find {
+      val dir = new File(".").listFiles().toSeq.find {
         f => f.isDirectory && f.getName.startsWith("kafka")
       }.map { d =>
         val classPath =
@@ -271,6 +279,11 @@ object KafkaServer {
 
         (d, new Loader(classPath))
       }.getOrElse {throw new IllegalStateException("Kafka distribution dir not found") }
+
+      // set the log4j configuration file using the system environment properties
+      System.setProperty("log4j.configurationFile", new File(dir._1, "config/log4j.properties").getPath)
+      
+      dir
     }
   }
 }
