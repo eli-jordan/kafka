@@ -210,7 +210,7 @@ class Broker(_id: String = "0") {
 
   def shouldStop: Boolean = !active && task != null && !task.stopping
 
-  def registerStart(hostname: String, port: Integer = null): Unit = {
+  def registerStart(hostname: String, port: Integer): Unit = {
     stickiness.registerStart(hostname, port)
     failover.resetFailures()
   }
