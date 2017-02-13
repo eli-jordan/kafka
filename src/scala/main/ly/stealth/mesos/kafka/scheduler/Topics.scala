@@ -104,8 +104,8 @@ class Topics {
       AdminUtilsWrapper().addPartitions(topic.name, partitions)
     
     AdminUtilsWrapper().changeTopicConfig(topic.name, config)
-    
-    topic
+
+    getTopic(topic.name)
   }
 
   def validateOptions(options: Map[String, String]): String = {
