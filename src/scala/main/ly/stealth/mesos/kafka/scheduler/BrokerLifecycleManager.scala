@@ -133,6 +133,7 @@ trait BrokerLifecycleManagerComponentImpl extends BrokerLifecyleManagerComponent
 
       var port: Integer = null
       if (broker.task.endpoint != null) port = broker.task.endpoint.port
+      logger.info(s"Registering broker at ${broker.task.hostname}:${port}")
       broker.registerStart(broker.task.hostname, port)
     }
 

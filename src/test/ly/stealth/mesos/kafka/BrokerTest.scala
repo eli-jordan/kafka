@@ -17,23 +17,22 @@
 
 package ly.stealth.mesos.kafka
 
-import com.google.protobuf.Descriptors
-import org.apache.mesos.Protos.Resource.DiskInfo
-import org.apache.mesos.Protos.Resource.DiskInfo.{Persistence, Source}
-import org.apache.mesos.Protos.Resource.DiskInfo.Source.{Mount, Type}
-import org.junit.{Before, Test}
-import org.junit.Assert._
-import ly.stealth.mesos.kafka.Util.BindAddress
-import net.elodina.mesos.util.{Constraint, Period, Range}
-import net.elodina.mesos.util.Strings.parseMap
-import java.util.{Collections, Date}
-import scala.collection.JavaConversions._
-import ly.stealth.mesos.kafka.Broker.{Endpoint, Failover, State, Stickiness, Task}
 import java.util
+import java.util.{Collections, Date}
+
+import ly.stealth.mesos.kafka.Broker._
+import ly.stealth.mesos.kafka.Util.BindAddress
 import ly.stealth.mesos.kafka.executor.LaunchConfig
 import ly.stealth.mesos.kafka.json.JsonUtil
 import ly.stealth.mesos.kafka.scheduler.mesos.OfferResult
-import org.apache.mesos.Protos.{Offer, Resource, Value, Volume}
+import net.elodina.mesos.util.Strings.parseMap
+import net.elodina.mesos.util.{Constraint, Period, Range}
+import org.apache.mesos.Protos.Resource.DiskInfo.Source
+import org.apache.mesos.Protos.{Offer, Resource}
+import org.junit.Assert._
+import org.junit.{Before, Test}
+
+import scala.collection.JavaConversions._
 
 class BrokerTest extends KafkaMesosTestCase {
 
@@ -466,6 +465,7 @@ class BrokerTest extends KafkaMesosTestCase {
     broker.log4jOptions = parseMap("b=2").toMap
     broker.jvmOptions = "-Xms512m"
 
+    broker.stickiness.registerStart("localhost", 1234)
     broker.failover.registerFailure(new Date())
     broker.task = new Task("1", "slave", "executor", "host")
 
@@ -728,6 +728,7 @@ object BrokerTest {
     if (checkNulls(expected, actual)) return
 
     assertEquals(expected.period, actual.period)
+    assertEquals(expected.port, actual.port)
     assertEquals(expected.stopTime, actual.stopTime)
     assertEquals(expected.hostname, actual.hostname)
   }
