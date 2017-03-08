@@ -16,29 +16,27 @@
  */
 package ly.stealth.mesos.kafka
 
-import java.io.{File, FileWriter}
-
-import org.I0Itec.zkclient.{IDefaultNameSpace, ZkClient, ZkServer}
-import org.apache.log4j.{BasicConfigurator, Level, Logger}
-import ly.stealth.mesos.kafka.Cluster.FsStorage
-import net.elodina.mesos.util.{IO, Net, Period, Version}
-import org.junit.{After, Before, Ignore}
-
-import scala.concurrent.duration.Duration
-import scala.collection.JavaConversions._
-import java.util.concurrent.atomic.AtomicBoolean
+import java.io.File
 import java.util
 import java.util.Date
+import java.util.concurrent.atomic.AtomicBoolean
 
-import kafka.utils.{Json, SystemTime}
+import kafka.utils.Json
+import ly.stealth.mesos.kafka.Cluster.FsStorage
 import ly.stealth.mesos.kafka.executor.{BrokerServer, Executor, KafkaServer, LaunchConfig}
 import ly.stealth.mesos.kafka.scheduler._
 import net.elodina.mesos.test.TestSchedulerDriver
+import net.elodina.mesos.util.{IO, Net, Period, Version}
 import org.I0Itec.zkclient.exception.ZkMarshallingError
 import org.I0Itec.zkclient.serialize.ZkSerializer
+import org.I0Itec.zkclient.{IDefaultNameSpace, ZkClient, ZkServer}
+import org.apache.log4j.{BasicConfigurator, Level, Logger}
 import org.apache.mesos.Protos.{Status, TaskState}
-import org.apache.zookeeper.data.Stat
 import org.junit.Assert._
+import org.junit.{After, Before, Ignore}
+
+import scala.collection.JavaConversions._
+import scala.concurrent.duration.Duration
 
 @Ignore
 class KafkaMesosTestCase extends net.elodina.mesos.test.MesosTestCase {
@@ -149,7 +147,7 @@ class KafkaMesosTestCase extends net.elodina.mesos.test.MesosTestCase {
           "port" -> 123,
           "endpoints" -> List("PLAINTEXT://localhost:1234"),
           "jmx_port" -> 1234,
-          "timestamp" -> SystemTime.milliseconds.toString
+          "timestamp" -> System.currentTimeMillis.toString
     )
     zkClient.createPersistent("/brokers/ids/0", true)
     zkClient.setZkSerializer(ZKStringSerializer)
