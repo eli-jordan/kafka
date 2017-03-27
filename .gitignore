@@ -5,6 +5,7 @@ project/*
 *.ipr
 .idea/*
 todo.txt
+classes
 
 src/docker/.docker
 vagrant/.vagrant

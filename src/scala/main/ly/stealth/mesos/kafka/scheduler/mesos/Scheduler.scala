@@ -87,6 +87,13 @@ trait SchedulerComponentImpl extends SchedulerComponent with SchedulerDriverComp
   private[this] var _driver: SchedulerDriver = _
   implicit def driver = _driver
 
+  object NonTerminalState {
+    def unapply(state: TaskState): Boolean =
+      state == TaskState.TASK_RUNNING ||
+      state == TaskState.TASK_STAGING ||
+      state == TaskState.TASK_STARTING
+  }
+
   class KafkaMesosSchedulerImpl extends KafkaMesosScheduler {
     private val logger: Logger = Logger.getLogger(classOf[KafkaMesosScheduler])
 
@@ -138,9 +145,14 @@ trait SchedulerComponentImpl extends SchedulerComponent with SchedulerDriverComp
         broker match {
           case Some(b) => brokerLifecycleManager.onBrokerStatus(b, status)
           case None =>
-            logger.info(
-              s"Got ${ status.getState } for unknown broker, killing task $taskId")
-            brokerTaskManager.killTask(taskId)
+            status.getState match {
+              case NonTerminalState() => {
+                logger.info(
+                  s"Got ${ status.getState } for unknown broker, killing task $taskId")
+                brokerTaskManager.killTask(taskId)
+              }
+              case _ => logger.info(s"Got ${status.getState} for unknown broker. No need to kill task, since it is already terminal.")
+            }
         })
     }
 
