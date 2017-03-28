@@ -25,7 +25,7 @@ import javax.ws.rs.{GET, POST, Path, QueryParam}
 import ly.stealth.mesos.kafka._
 import ly.stealth.mesos.kafka.json.JsonUtil
 import ly.stealth.mesos.kafka.scheduler.mesos.{ClusterComponent, SchedulerComponent}
-import ly.stealth.mesos.kafka.scheduler.{BrokerLifecyleManagerComponent, BrokerLogManagerComponent, HttpApiComponent, KafkaDistributionComponent}
+import ly.stealth.mesos.kafka.scheduler.{BrokerLifecycleManagerComponent, BrokerLogManagerComponent, HttpApiComponent, KafkaDistributionComponent}
 import org.apache.log4j.{Level, Logger}
 import org.eclipse.jetty.server.handler.HandlerList
 import org.eclipse.jetty.server.{Server, ServerConnector}
@@ -50,7 +50,7 @@ trait HttpServerComponentImpl extends HttpServerComponent {
     with SchedulerComponent
     with KafkaDistributionComponent
     with BrokerLogManagerComponent
-    with BrokerLifecyleManagerComponent
+    with BrokerLifecycleManagerComponent
     with HttpApiComponent =>
 
   val httpServer = new HttpServerImpl
@@ -62,8 +62,8 @@ trait HttpServerComponentImpl extends HttpServerComponent {
   }
 
   class HttpServerImpl extends HttpServer {
-    val logger = Logger.getLogger(classOf[HttpServerImpl])
-    var server: Server = _
+    private val logger = Logger.getLogger("HttpServerImpl")
+    private var server: Server = _
 
     @Path("/")
     class FileServer {
@@ -134,12 +134,11 @@ trait HttpServerComponentImpl extends HttpServerComponent {
       ): Response = {
         val logger = inLogger match {
           case "root" => Logger.getRootLogger
-          case "scheduler" => Logger.getLogger(classOf[KafkaMesosScheduler])
-          case "brokerManager" => Logger.getLogger(classOf[BrokerLifecycleManager])
+          case "scheduler" => Logger.getLogger("KafkaMesosScheduler")
+          case "brokerManager" => Logger.getLogger("BrokerLifecycleManager")
           case l => Logger.getLogger(l)
         }
         logger.setLevel(Level.toLevel(level))
-
         Response.ok.build()
       }
     }

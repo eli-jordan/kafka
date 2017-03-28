@@ -7,10 +7,11 @@ plugins {
     id 'com.github.hierynomus.license' version '0.13.1'
 }
 
+def scalaVersion = "2.11.8"
 def mesosVersion = "0.28.0"
 ext.kafkaVersion = project.hasProperty("kafkaVersion") ? project.getProperty("kafkaVersion") : "0.10.2.0"
 def kafkaMajorVersion="${kafkaVersion.split("\\.").take(2).join("_")}"
-def kafkaScalaVersion="2.11"
+def kafkaScalaVersion=scalaVersion.split("\\.").take(2).join(".")
 def jettyVersion = "9.0.4.v20130625"
 def jerseyVersion = "2.24"
 def jacksonVersion = "2.8.2"
@@ -19,8 +20,7 @@ version = new File('src/scala/main/ly/stealth/mesos/kafka/Config.scala')
         .readLines()
         .findResult({ x -> x.contains("val value = \"") ? x.substring(x.indexOf("\"") + 1, x.lastIndexOf("\"")) : null })
 
-def artifact = "kafka-mesos-${version}-kafka_$kafkaScalaVersion-${kafkaVersion.replace('_', '.')}"
-jar.archiveName = "${artifact}.jar"
+jar.archiveName = "kafka-mesos-${version}-kafka_$kafkaScalaVersion-${kafkaVersion.replace('_', '.')}.jar"
 
 
 repositories {
@@ -53,7 +53,7 @@ sourceSets {
 }
 
 dependencies {
-    compile "org.scala-lang:scala-library:2.11.8"
+    compile "org.scala-lang:scala-library:$scalaVersion"
     compile "org.apache.mesos:mesos:$mesosVersion"
     compile name: "util-mesos-0.1.0.0"
     compile "com.google.protobuf:protobuf-java:2.5.0"
@@ -95,7 +95,7 @@ dependencies {
 }
 
 jar {
-//    dependsOn 'test'
+    dependsOn 'test'
 
     doFirst {
         from(configurations.compile.collect { it.isDirectory() ? it : zipTree(it) }) {
@@ -107,23 +107,6 @@ jar {
         }
     }
     manifest.attributes("Main-Class": "ly.stealth.mesos.kafka.cli.Cli")
-}
-
-def uploadUser = project.getProperty('uploadUser');
-def uploadPassword = project.getProperty('uploadPassword')
-uploadArchives {
-    repositories {
-        mavenDeployer {
-            repository(url: 'http://dx-buildrepository.rtp.raleigh.ibm.com/artifactory/libs-release-local') {
-                authentication(userName: uploadUser, password: uploadPassword)
-            }
-            pom {
-                groupId = 'com.ibm.dx.kafka'
-                artifactId = artifact
-                version = '0.9.5.6-test'
-            }
-        }
-    }
 }
 
 task wrapper(type: Wrapper) {
@@ -151,4 +134,24 @@ import de.undercouch.gradle.tasks.download.Download
 task downloadKafka(type: Download) {
     src "https://archive.apache.org/dist/kafka/${kafkaVersion}/kafka_${kafkaScalaVersion}-${kafkaVersion}.tgz"
     dest rootDir
+}
+
+// DX added config below here
+
+def artifact = "kafka-mesos-${version}-kafka_$kafkaScalaVersion-${kafkaVersion.replace('_', '.')}"
+def uploadUser = project.hasProperty('uploadUser') ? project.getProperty('uploadUser') : ''
+def uploadPassword = project.hasProperty('uploadPassword') ? project.getProperty('uploadPassword') : ''
+uploadArchives {
+    repositories {
+        mavenDeployer {
+            repository(url: 'http://dx-buildrepository.rtp.raleigh.ibm.com/artifactory/libs-release-local') {
+                authentication(userName: uploadUser, password: uploadPassword)
+            }
+            pom {
+                groupId = 'com.ibm.dx.kafka'
+                artifactId = artifact
+                version = '0.9.5.6'
+            }
+        }
+    }
 }

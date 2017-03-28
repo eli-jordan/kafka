@@ -44,6 +44,7 @@ object Config {
 
   var reconciliationTimeout = new Period("5m")
   var reconciliationAttempts = 6
+  var reconciliationInterval = new Period((reconciliationTimeout.ms() * reconciliationAttempts) + "ms")
 
   var jre: File = null
   var log: File = null

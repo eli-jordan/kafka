@@ -30,8 +30,7 @@ import ly.stealth.mesos.kafka.json.JsonUtil
 import ly.stealth.mesos.kafka.scheduler.mesos.OfferResult
 import net.elodina.mesos.util.{Constraint, Period, Range, Repr}
 
-class Broker(_id: String = "0") {
-  var id: String = _id
+class Broker(val id: Int = 0) {
   @volatile var active: Boolean = false
 
   var cpus: Double = 1
@@ -55,7 +54,8 @@ class Broker(_id: String = "0") {
   // broker has been modified while being in non stopped state, once stopped or before task launch becomes false
   var needsRestart: Boolean = false
 
-  @volatile var task: Broker.Task = null
+  @volatile var task: Broker.Task = _
+  @volatile var lastTask: Broker.Task = _
 
   def matches(offer: Offer, now: Date = new Date(), otherAttributes: Broker.OtherAttributes = Broker.NoAttributes): OfferResult = {
     // check resources
@@ -260,7 +260,7 @@ class Broker(_id: String = "0") {
     matches
   }
 
-  def clone(newId: String): Broker = {
+  def clone(newId: Int): Broker = {
     val nb = new Broker(newId)
     nb.cpus = cpus
     nb.mem = mem
@@ -292,9 +292,9 @@ object Broker {
 
   def nextExecutorId(broker: Broker): String = Config.frameworkName + "-" + broker.id + "-" + UUID.randomUUID()
 
-  def idFromTaskId(taskId: String): String = taskId.dropRight(37).replace(Config.frameworkName + "-", "")
+  def idFromTaskId(taskId: String): Int = taskId.dropRight(37).replace(Config.frameworkName + "-", "").toInt
 
-  def idFromExecutorId(executorId: String): String = idFromTaskId(executorId)
+  def idFromExecutorId(executorId: String): Int = idFromTaskId(executorId)
 
   def isOptionOverridable(name: String): Boolean = !Set("broker.id", "port", "zookeeper.connect").contains(name)
 
@@ -392,11 +392,12 @@ object Broker {
     slaveId: String = null,
     executorId: String = null,
     hostname: String = null,
-    attributes: Map[String, String] = Map(),
-    _state: String = State.STARTING
+    attributes: Map[String, String] = Map()
   ) {
-    @volatile var state: String = _state
+    @volatile var state: String = State.PENDING
     var endpoint: Endpoint = null
+
+    def pending: Boolean = state == State.PENDING
 
     def starting: Boolean = state == State.STARTING
 
@@ -533,6 +534,7 @@ object Broker {
   }
 
   object State {
+    val PENDING = "pending"
     val STARTING = "starting"
     val RUNNING = "running"
     val RECONCILING = "reconciling"

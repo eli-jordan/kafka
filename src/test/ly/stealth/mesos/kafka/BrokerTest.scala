@@ -41,7 +41,7 @@ class BrokerTest extends KafkaMesosTestCase {
   @Before
   override def before {
     super.before
-    broker = new Broker("0")
+    broker = new Broker(0)
     broker.cpus = 0
     broker.mem = 0
   }
@@ -50,27 +50,27 @@ class BrokerTest extends KafkaMesosTestCase {
   def options {
     {
       // $id substitution
-      val li = LaunchConfig("0", Map("a" -> "$id", "b" -> "2"), false, Map(), null, Map())
+      val li = LaunchConfig(0, Map("a" -> "$id", "b" -> "2"), false, Map(), null, Map())
       assertEquals(Map("a" -> "0", "b" -> "2"), li.interpolatedOptions)
     }
     {
       // defaults
-      val li = LaunchConfig("0", Map("a" -> "2"), false, Map(), null, Map("b" -> "1"))
+      val li = LaunchConfig(0, Map("a" -> "2"), false, Map(), null, Map("b" -> "1"))
       assertEquals(Map("b" -> "1", "a" -> "2"), li.interpolatedOptions)
     }
 
     {
       // bind-address
-      val li = LaunchConfig("0", Map("host.name" -> "123"), false, Map(), null, Map())
+      val li = LaunchConfig(0, Map("host.name" -> "123"), false, Map(), null, Map())
       assertEquals(Map("host.name" -> "123"), li.interpolatedOptions)
     }
     {
-      val li = LaunchConfig("0", Map("host.name" -> "123"), false, Map(), new BindAddress("127.0.0.1"), Map())
+      val li = LaunchConfig(0, Map("host.name" -> "123"), false, Map(), new BindAddress("127.0.0.1"), Map())
       assertEquals(Map("host.name" -> "127.0.0.1"), li.interpolatedOptions)
     }
     {
       broker.bindAddress = new BindAddress("127.0.0.1")
-      val li = LaunchConfig("0", Map("listeners" -> "PLAINTEXT://:3002", "port" -> "3002"), false, Map(), new BindAddress("127.0.0.1"), Map())
+      val li = LaunchConfig(0, Map("listeners" -> "PLAINTEXT://:3002", "port" -> "3002"), false, Map(), new BindAddress("127.0.0.1"), Map())
       assertEquals(Map("host.name" -> "127.0.0.1", "port" -> "3002", "listeners" -> "PLAINTEXT://127.0.0.1:3002"), li.interpolatedOptions)
     }
   }
@@ -402,7 +402,8 @@ class BrokerTest extends KafkaMesosTestCase {
   def state {
     assertEquals("stopped", broker.state())
 
-    broker.task = Task(_state = State.STOPPING)
+    broker.task = Task()
+    broker.task.state = State.STOPPING
     assertEquals("stopping", broker.state())
 
     broker.task = null
@@ -410,7 +411,7 @@ class BrokerTest extends KafkaMesosTestCase {
     assertEquals("starting", broker.state())
 
     broker.task = Task()
-    assertEquals("starting", broker.state())
+    assertEquals("pending", broker.state())
 
     broker.task.state = State.RUNNING
     assertEquals("running", broker.state())
@@ -433,7 +434,10 @@ class BrokerTest extends KafkaMesosTestCase {
           setName(classOf[BrokerTest].getSimpleName + "-scheduleState")
           Thread.sleep(delay)
 
-          if (state != null) broker.task = new Task(_state = state)
+          if (state != null) {
+            broker.task = Task()
+            broker.task.state = state
+          }
           else broker.task = null
         }
       }.start()
@@ -477,8 +481,8 @@ class BrokerTest extends KafkaMesosTestCase {
   // static part
   @Test
   def idFromTaskId {
-    assertEquals("0", Broker.idFromTaskId(Broker.nextTaskId(new Broker("0"))))
-    assertEquals("100", Broker.idFromTaskId(Broker.nextTaskId(new Broker("100"))))
+    assertEquals(0, Broker.idFromTaskId(Broker.nextTaskId(new Broker(0))))
+    assertEquals(100, Broker.idFromTaskId(Broker.nextTaskId(new Broker(100))))
   }
 
   // Reservation
@@ -679,7 +683,8 @@ class BrokerTest extends KafkaMesosTestCase {
   // Task
   @Test
   def Task_toJson_fromJson {
-    val task = new Task("id", "slave", "executor", "host", parseMap("a=1,b=2").toMap, State.RUNNING)
+    val task = Task("id", "slave", "executor", "host", parseMap("a=1,b=2").toMap)
+    task.state = State.RUNNING
     task.endpoint = new Endpoint("localhost:9092")
 
     val read = JsonUtil.fromJson[Task](JsonUtil.toJson(task))

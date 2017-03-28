@@ -16,27 +16,26 @@
  */
 package ly.stealth.mesos.kafka
 
-import java.io.File
+import java.io.{File, FileWriter}
+
+import org.I0Itec.zkclient.{DataUpdater, IDefaultNameSpace, ZkClient, ZkServer}
+import org.apache.log4j.{Appender, BasicConfigurator, ConsoleAppender, Level, Logger, PatternLayout}
+import ly.stealth.mesos.kafka.Cluster.FsStorage
+import net.elodina.mesos.util.{IO, Net, Period, Version}
+import org.junit.{After, Before, Ignore}
+
+import scala.concurrent.duration.Duration
+import scala.collection.JavaConversions._
+import java.util.concurrent.atomic.AtomicBoolean
 import java.util
 import java.util.Date
-import java.util.concurrent.atomic.AtomicBoolean
 
-import kafka.utils.Json
-import ly.stealth.mesos.kafka.Cluster.FsStorage
 import ly.stealth.mesos.kafka.executor.{BrokerServer, Executor, KafkaServer, LaunchConfig}
 import ly.stealth.mesos.kafka.scheduler._
 import net.elodina.mesos.test.TestSchedulerDriver
-import net.elodina.mesos.util.{IO, Net, Period, Version}
-import org.I0Itec.zkclient.exception.ZkMarshallingError
-import org.I0Itec.zkclient.serialize.ZkSerializer
-import org.I0Itec.zkclient.{IDefaultNameSpace, ZkClient, ZkServer}
-import org.apache.log4j.{BasicConfigurator, Level, Logger}
 import org.apache.mesos.Protos.{Status, TaskState}
+import org.apache.zookeeper.CreateMode
 import org.junit.Assert._
-import org.junit.{After, Before, Ignore}
-
-import scala.collection.JavaConversions._
-import scala.concurrent.duration.Duration
 
 @Ignore
 class KafkaMesosTestCase extends net.elodina.mesos.test.MesosTestCase {
@@ -81,7 +80,8 @@ class KafkaMesosTestCase extends net.elodina.mesos.test.MesosTestCase {
 
   def started(broker: Broker) {
     registry.scheduler.resourceOffers(schedulerDriver, Seq(offer("slave" + broker.id, "cpus:2.0;mem:2048;ports:9042..65000")))
-    broker.waitFor(Broker.State.STARTING, new Period("1s"), 1)
+    broker.waitFor(Broker.State.PENDING, new Period("1s"), 1)
+    registry.scheduler.statusUpdate(schedulerDriver, taskStatus(broker.task.id, TaskState.TASK_STARTING, "slave" + broker.id + ":9042"))
     registry.scheduler.statusUpdate(schedulerDriver, taskStatus(broker.task.id, TaskState.TASK_RUNNING, "slave" + broker.id + ":9042"))
     broker.waitFor(Broker.State.RUNNING, new Period("1s"), 1)
     assertEquals(Broker.State.RUNNING, broker.task.state)
@@ -97,7 +97,11 @@ class KafkaMesosTestCase extends net.elodina.mesos.test.MesosTestCase {
 
   @Before
   def before {
-    BasicConfigurator.configure()
+    BasicConfigurator.resetConfiguration()
+    val layout = new PatternLayout("%d %-5p %23c] %m%n")
+    val appender: Appender = new ConsoleAppender(layout)
+
+    Logger.getRootLogger.addAppender(appender)
     Logger.getLogger("org.apache.zookeeper").setLevel(Level.FATAL)
     Logger.getLogger("org.I0Itec.zkclient").setLevel(Level.FATAL)
 
@@ -142,33 +146,17 @@ class KafkaMesosTestCase extends net.elodina.mesos.test.MesosTestCase {
     zkServer.start()
 
     val zkClient: ZkClient = zkServer.getZkClient
-    val brokerMetatdata = Map("version" -> 3,
-          "host" -> "localhost",
-          "port" -> 123,
-          "endpoints" -> List("PLAINTEXT://localhost:1234"),
-          "jmx_port" -> 1234,
-          "timestamp" -> System.currentTimeMillis.toString
-    )
-    zkClient.createPersistent("/brokers/ids/0", true)
     zkClient.setZkSerializer(ZKStringSerializer)
-    zkClient.writeData("/brokers/ids/0", Json.encode(brokerMetatdata))
+
+    // we have to set the content of the node since kafka 0.10 requires this
+    // for topic updates
+    val brokerConfig =
+        """{"listener_security_protocol_map": { "PLAINTEXT": "PLAINTEXT" }, "endpoints": [ "PLAINTEXT://localhost:9005"], "jmx_port": -1, "host": "localhost", "timestamp": "1490681335158", "port": 9005, "version": 4 }"""
+    zkClient.createPersistent("/brokers/ids/0", true)
+    zkClient.writeData("/brokers/ids/0", brokerConfig)
     zkClient.createPersistent("/config/changes", true)
     zkClient
   }
-
-    object ZKStringSerializer extends ZkSerializer {
-
-        @throws(classOf[ZkMarshallingError])
-        def serialize(data : Object) : Array[Byte] = data.asInstanceOf[String].getBytes("UTF-8")
-
-        @throws(classOf[ZkMarshallingError])
-        def deserialize(bytes : Array[Byte]) : Object = {
-            if (bytes == null)
-                null
-            else
-                new String(bytes, "UTF-8")
-        }
-    }
 
   def stopZkServer() {
     if (zkDir == null) return
@@ -236,7 +224,7 @@ class TestRebalancer extends Rebalancer {
 
   override def running: Boolean = _running
 
-  override def start(topics: util.List[String], brokers: util.List[String], replicas: Int = -1, fixedStartIndex: Int = -1, startPartitionId: Int = -1, realignment: Boolean = false): Unit = {
+  override def start(topics: Seq[String], brokers: Seq[Int], replicas: Int = -1, fixedStartIndex: Int = -1, startPartitionId: Int = -1, realignment: Boolean = false): Unit = {
     if (_failOnStart) throw new Rebalancer.Exception("failOnStart")
     _running = true
   }

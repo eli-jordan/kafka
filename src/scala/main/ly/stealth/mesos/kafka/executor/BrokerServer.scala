@@ -31,7 +31,7 @@ import org.apache.log4j.Logger
 import scala.collection.JavaConversions._
 
 case class LaunchConfig(
-  id: String,
+  id: Int,
   options: Map[String, String] = Map(),
   syslog: Boolean = false,
   log4jOptions: Map[String, String] = Map(),
@@ -53,11 +53,11 @@ case class LaunchConfig(
       }
     }
 
-    result.mapValues(v => v.replace("$id", id))
+    result.mapValues(v => v.replace("$id", id.toString))
   }
 
   def interpolatedLog4jOptions: Map[String, String] = {
-    log4jOptions.mapValues(v => v.replace("$id", id))
+    log4jOptions.mapValues(v => v.replace("$id", id.toString))
   }
 }
 
@@ -71,7 +71,7 @@ abstract class BrokerServer {
 }
 
 class KafkaServer extends BrokerServer {
-  val logger = Logger.getLogger(classOf[BrokerServer])
+  val logger = Logger.getLogger("BrokerServer")
   @volatile var server: Object = _
   @volatile private var collector: MetricCollectorProxy = _
   private val stopping = new AtomicBoolean(false)

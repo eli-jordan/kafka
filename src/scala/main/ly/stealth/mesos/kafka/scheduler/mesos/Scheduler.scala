@@ -22,7 +22,7 @@ import java.util.concurrent.{Executors, ScheduledExecutorService}
 import ly.stealth.mesos.kafka._
 import ly.stealth.mesos.kafka.RunnableConversions._
 import ly.stealth.mesos.kafka.json.JsonUtil
-import ly.stealth.mesos.kafka.scheduler.{BrokerLifecyleManagerComponent, BrokerLogManagerComponent, Registry}
+import ly.stealth.mesos.kafka.scheduler.{BrokerLifecycleManagerComponent, BrokerLogManagerComponent, BrokerState, Registry}
 import net.elodina.mesos.util.{Repr, Version}
 import org.apache.log4j._
 import org.apache.mesos.Protos._
@@ -35,7 +35,7 @@ class MesosDriverException(status: Status) extends Exception
 class DriverDisconnectedException extends Exception
 
 object Driver {
-  private[this] val logger = Logger.getLogger(this.getClass)
+  private[this] val logger = Logger.getLogger("Driver")
 
   def call(fn: SchedulerDriver => Status)(implicit driver: SchedulerDriver): Unit = {
     if (driver == null) {
@@ -66,6 +66,7 @@ trait SchedulerComponent {
   val scheduler: KafkaMesosScheduler
 
   trait KafkaMesosScheduler extends org.apache.mesos.Scheduler {
+    def tryLaunchBrokers(offers: Seq[Offer]): Boolean
     def requestBrokerLog(broker: Broker, name: String, lines: Int, timeout: Duration): Future[String]
     def stop(): Unit
     def kill(): Unit
@@ -79,7 +80,7 @@ trait SchedulerComponentImpl extends SchedulerComponent with SchedulerDriverComp
     with ClusterComponent
     with BrokerLogManagerComponent
     with SchedulerDriverComponent
-    with BrokerLifecyleManagerComponent
+    with BrokerLifecycleManagerComponent
     with BrokerTaskManagerComponent
     with EventLoopComponent =>
 
@@ -87,15 +88,8 @@ trait SchedulerComponentImpl extends SchedulerComponent with SchedulerDriverComp
   private[this] var _driver: SchedulerDriver = _
   implicit def driver = _driver
 
-  object NonTerminalState {
-    def unapply(state: TaskState): Boolean =
-      state == TaskState.TASK_RUNNING ||
-      state == TaskState.TASK_STAGING ||
-      state == TaskState.TASK_STARTING
-  }
-
   class KafkaMesosSchedulerImpl extends KafkaMesosScheduler {
-    private val logger: Logger = Logger.getLogger(classOf[KafkaMesosScheduler])
+    private val logger: Logger = Logger.getLogger("KafkaMesosScheduler")
 
     def registered(driver: SchedulerDriver, id: FrameworkID, master: MasterInfo): Unit = {
       logger
@@ -126,10 +120,36 @@ trait SchedulerComponentImpl extends SchedulerComponent with SchedulerDriverComp
           offers.foreach(o => offerManager.declineOffer(o.getId))
         }
         else {
-          if (brokerLifecycleManager.tryLaunchBrokers(offers)) {
+          if (tryLaunchBrokers(offers)) {
             cluster.save()
           }
         })
+    }
+
+    private def debugLog(result: Either[OfferResult.Accept, Seq[OfferResult.Decline]]): Unit = {
+      if (logger.isDebugEnabled)
+        logger.debug(
+          result match {
+            case Left(r) => s"[ACCEPT ]: ${ Repr.offer(r.offer) } => ${ r.broker }"
+            case Right(r) => "[DECLINE]: " + r
+              .map(d => s"\t${ Repr.offer(d.offer) } for ${ d.duration }s because ${ d.reason } ")
+              .mkString("\n")
+          })
+    }
+
+    def tryLaunchBrokers(offers: Seq[Offer]): Boolean = {
+      val brokers = cluster.getBrokers.toSet
+      offers.foldLeft(false)((launched, o) => {
+        val r = offerManager.tryAcceptOffer(o, brokers)
+        // If the broker matched, remove it from the list so it doesn't match other offers too.
+        debugLog(r)
+        r match {
+          case Left(accept) =>
+            brokerLifecycleManager.tryTransition(accept.broker, BrokerState.Starting(accept))
+            true
+          case _ => launched
+        }
+      })
     }
 
     def offerRescinded(driver: SchedulerDriver, id: OfferID): Unit = {
@@ -138,22 +158,7 @@ trait SchedulerComponentImpl extends SchedulerComponent with SchedulerDriverComp
 
     def statusUpdate(driver: SchedulerDriver, status: TaskStatus): Unit = {
       logger.info("[statusUpdate] " + Repr.status(status))
-      val taskId = status.getTaskId
-      val broker = cluster.getBrokerByTaskId(taskId.getValue)
-
-      eventLoop.execute(() =>
-        broker match {
-          case Some(b) => brokerLifecycleManager.onBrokerStatus(b, status)
-          case None =>
-            status.getState match {
-              case NonTerminalState() => {
-                logger.info(
-                  s"Got ${ status.getState } for unknown broker, killing task $taskId")
-                brokerTaskManager.killTask(taskId)
-              }
-              case _ => logger.info(s"Got ${status.getState} for unknown broker. No need to kill task, since it is already terminal.")
-            }
-        })
+      eventLoop.execute(() => brokerLifecycleManager.tryTransition(status))
     }
 
     def frameworkMessage(
@@ -313,10 +318,11 @@ object KafkaMesosScheduler {
     Logger.getLogger("org.apache.zookeeper").setLevel(Level.WARN)
     Logger.getLogger("org.I0Itec.zkclient").setLevel(Level.WARN)
 
-    val logger = Logger.getLogger(KafkaMesosScheduler.getClass)
+    val logger = Logger.getLogger("KafkaMesosScheduler")
     logger.setLevel(if (Config.debug) Level.DEBUG else Level.INFO)
 
-    val layout = new PatternLayout("%d %-5p %c %x - %m%n")
+    val layout = new PatternLayout("%d %-5p %23c] %m%n")
+
 
     var appender: Appender = null
     if (Config.log == null) appender = new ConsoleAppender(layout)
