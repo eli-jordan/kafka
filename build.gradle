@@ -109,16 +109,18 @@ jar {
     manifest.attributes("Main-Class": "ly.stealth.mesos.kafka.cli.Cli")
 }
 
+def uploadUser = project.getProperty('uploadUser');
+def uploadPassword = project.getProperty('uploadPassword')
 uploadArchives {
     repositories {
         mavenDeployer {
             repository(url: 'http://dx-buildrepository.rtp.raleigh.ibm.com/artifactory/libs-release-local') {
-                authentication(userName: 'admin', password: 'password')
+                authentication(userName: uploadUser, password: uploadPassword)
             }
             pom {
                 groupId = 'com.ibm.dx.kafka'
                 artifactId = artifact
-                version = '0.9.5.6'
+                version = '0.9.5.6-test'
             }
         }
     }

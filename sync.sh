@@ -4,6 +4,9 @@ SYNC_DIR="sync-stage"
 MAIN_REPO_URL="git@github.ibm.com:DX/prod-infra-mesos-kafka.git"
 REPLICA_REPO="git@github.com:eli-jordan/kafka.git"
 
+ROOT="$PWD"
+
+
 rm -rf "$SYNC_DIR"
 
 echo "Fetching main repo from $MAIN_REPO_URL"
@@ -16,4 +19,5 @@ echo "Pushing to replica repo $REPLICA_REPO"
 git push replica --all 
 git push replica --tags
 
+cd "$ROOT"
 rm -rf "$SYNC_DIR"

@@ -6,6 +6,7 @@ project/*
 .idea/*
 todo.txt
 classes
+prod-infra-mesos-kafka-*
 
 src/docker/.docker
 vagrant/.vagrant
