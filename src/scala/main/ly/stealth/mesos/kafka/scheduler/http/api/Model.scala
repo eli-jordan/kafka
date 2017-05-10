@@ -18,6 +18,7 @@ package ly.stealth.mesos.kafka.scheduler.http.api
 
 import javax.ws.rs.core.Response
 import javax.ws.rs.core.Response.StatusType
+import ly.stealth.mesos.kafka.HttpErrorResponse
 import net.elodina.mesos.util.{Constraint, Strings}
 import scala.collection.JavaConverters._
 import scala.collection.mutable
@@ -37,6 +38,6 @@ object Status {
     override def getFamily: Response.Status.Family = Response.Status.BAD_REQUEST.getFamily
   }
   object BadRequest {
-    def apply(reason: String) = Response.status(new BadRequest(reason)).build()
+    def apply(reason: String) = Response.status(new BadRequest(reason)).entity(HttpErrorResponse(400, reason)).build()
   }
 }

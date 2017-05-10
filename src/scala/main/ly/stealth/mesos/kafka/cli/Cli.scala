@@ -21,6 +21,7 @@ import java.io._
 import java.net.{HttpURLConnection, URL, URLEncoder}
 import java.util
 import java.util.Properties
+import com.google.common.io.CharStreams
 import joptsimple.{BuiltinHelpFormatter, OptionException, OptionParser, OptionSet}
 import ly.stealth.mesos.kafka._
 import net.elodina.mesos.util.Strings
@@ -126,9 +127,13 @@ trait CliUtils
 
       try { response = Source.fromInputStream(connection.getInputStream).getLines().mkString}
       catch {
-        case e: IOException =>
-          if (connection.getResponseCode != 200) throw new IOException(connection.getResponseCode + " - " + connection.getResponseMessage)
+        case e: IOException => {
+          if (connection.getResponseCode != 200) {
+            val errorMessage:String = CharStreams.toString(new InputStreamReader(connection.getErrorStream()))
+            throw new IOException(connection.getResponseCode + " - " + errorMessage)
+          }
           else throw e
+        }
       }
     } finally {
       connection.disconnect()
