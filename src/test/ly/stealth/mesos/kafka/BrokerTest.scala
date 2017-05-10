@@ -17,23 +17,22 @@
 
 package ly.stealth.mesos.kafka
 
-import com.google.protobuf.Descriptors
-import org.apache.mesos.Protos.Resource.DiskInfo
-import org.apache.mesos.Protos.Resource.DiskInfo.{Persistence, Source}
-import org.apache.mesos.Protos.Resource.DiskInfo.Source.{Mount, Type}
-import org.junit.{Before, Test}
-import org.junit.Assert._
-import ly.stealth.mesos.kafka.Util.BindAddress
-import net.elodina.mesos.util.{Constraint, Period, Range}
-import net.elodina.mesos.util.Strings.parseMap
-import java.util.{Collections, Date}
-import scala.collection.JavaConversions._
-import ly.stealth.mesos.kafka.Broker.{Endpoint, Failover, State, Stickiness, Task}
 import java.util
+import java.util.{Collections, Date}
+
+import ly.stealth.mesos.kafka.Broker._
+import ly.stealth.mesos.kafka.Util.BindAddress
 import ly.stealth.mesos.kafka.executor.LaunchConfig
 import ly.stealth.mesos.kafka.json.JsonUtil
 import ly.stealth.mesos.kafka.scheduler.mesos.OfferResult
-import org.apache.mesos.Protos.{Offer, Resource, Value, Volume}
+import net.elodina.mesos.util.Strings.parseMap
+import net.elodina.mesos.util.{Constraint, Period, Range}
+import org.apache.mesos.Protos.Resource.DiskInfo.Source
+import org.apache.mesos.Protos.{Offer, Resource}
+import org.junit.Assert._
+import org.junit.{Before, Test}
+
+import scala.collection.JavaConversions._
 
 class BrokerTest extends KafkaMesosTestCase {
 
@@ -162,23 +161,26 @@ class BrokerTest extends KafkaMesosTestCase {
   def matches_stickiness {
     val host0 = "host0"
     val host1 = "host1"
-    val resources = "ports:0..10"
+    val resources0 = "ports:0..10"
+    val resources1 = "ports:11..20"
 
 
-    BrokerTest.assertAccept(broker.matches(offer(host0, resources), new Date(0)))
-    BrokerTest.assertAccept(broker.matches(offer(host1, resources), new Date(0)))
+    BrokerTest.assertAccept(broker.matches(offer(host0, resources0), new Date(0)))
+    BrokerTest.assertAccept(broker.matches(offer(host1, resources0), new Date(0)))
 
-    broker.registerStart(host0)
+    broker.registerStart(host0, 5)
     broker.registerStop(new Date(0))
 
-
-    BrokerTest.assertAccept(broker.matches(offer(host0, resources), new Date(0)))
-    val theOffer = offer(host1, resources)
+    BrokerTest.assertAccept(broker.matches(offer(host0, resources0), new Date(0)))
+    val theOffer = offer(host1, resources0)
     assertEquals(
       OfferResult.eventuallyMatch(
         theOffer, broker,
         "hostname != stickiness host", broker.stickiness.period.ms().toInt / 1000),
       broker.matches(theOffer, new Date(0)))
+
+    // should still work even if sticky port unavailable
+    BrokerTest.assertAccept(broker.matches(offer(host0, resources1), new Date(0)))
   }
 
   @Test
@@ -349,6 +351,14 @@ class BrokerTest extends KafkaMesosTestCase {
     assertEquals(100, broker.getSuitablePort(ranges("100..200")))
     assertEquals(95, broker.getSuitablePort(ranges("0..90,95..96,101..200")))
     assertEquals(96, broker.getSuitablePort(ranges("0..90,96,101..200")))
+
+    broker.registerStart("", 100)
+    broker.port = new Range("92..105")
+    assertEquals(100, broker.getSuitablePort(ranges("1..200")))
+
+    broker.registerStart("", 100)
+    broker.port = new Range("92..99")
+    assertEquals(92, broker.getSuitablePort(ranges("1..200")))
   }
 
   @Test
@@ -459,6 +469,7 @@ class BrokerTest extends KafkaMesosTestCase {
     broker.log4jOptions = parseMap("b=2").toMap
     broker.jvmOptions = "-Xms512m"
 
+    broker.stickiness.registerStart("localhost", 1234)
     broker.failover.registerFailure(new Date())
     broker.task = new Task("1", "slave", "executor", "host")
 
@@ -497,7 +508,7 @@ class BrokerTest extends KafkaMesosTestCase {
     assertTrue(stickiness.matchesHostname("host0"))
     assertTrue(stickiness.matchesHostname("host1"))
 
-    stickiness.registerStart("host0")
+    stickiness.registerStart("host0", null)
     stickiness.registerStop(new Date(0))
     assertTrue(stickiness.matchesHostname("host0"))
     assertFalse(stickiness.matchesHostname("host1"))
@@ -508,7 +519,7 @@ class BrokerTest extends KafkaMesosTestCase {
     val stickiness = new Stickiness()
     assertEquals(stickiness.stickyTimeLeft(), 0)
 
-    stickiness.registerStart("host0")
+    stickiness.registerStart("host0", null)
     stickiness.registerStop(new Date(0))
     val stickyTimeSec = (stickiness.period.ms() / 1000).toInt
     assertEquals(stickiness.stickyTimeLeft(new Date(0)), stickyTimeSec)
@@ -521,23 +532,26 @@ class BrokerTest extends KafkaMesosTestCase {
     assertNull(stickiness.hostname)
     assertNull(stickiness.stopTime)
 
-    stickiness.registerStart("host")
+    stickiness.registerStart("host", 1234)
     assertEquals("host", stickiness.hostname)
+    assertEquals(1234, stickiness.port)
     assertNull(stickiness.stopTime)
 
     stickiness.registerStop(new Date(0))
     assertEquals("host", stickiness.hostname)
+    assertEquals(1234, stickiness.port)
     assertEquals(new Date(0), stickiness.stopTime)
 
-    stickiness.registerStart("host1")
+    stickiness.registerStart("host1", 5678)
     assertEquals("host1", stickiness.hostname)
+    assertEquals(5678, stickiness.port)
     assertNull(stickiness.stopTime)
   }
 
   @Test
   def Stickiness_toJson_fromJson {
     val stickiness = new Stickiness()
-    stickiness.registerStart("localhost")
+    stickiness.registerStart("localhost", 1234)
     stickiness.registerStop(new Date(0))
 
     val read = JsonUtil.fromJson[Stickiness](JsonUtil.toJson(stickiness))
@@ -719,6 +733,7 @@ object BrokerTest {
     if (checkNulls(expected, actual)) return
 
     assertEquals(expected.period, actual.period)
+    assertEquals(expected.port, actual.port)
     assertEquals(expected.stopTime, actual.stopTime)
     assertEquals(expected.hostname, actual.hostname)
   }

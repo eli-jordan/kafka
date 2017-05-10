@@ -16,17 +16,24 @@
  */
 package ly.stealth.mesos.kafka.interface.impl
 
-import kafka.utils.{ZkUtils => KafkaZkUtils}
-import kafka.admin.{BrokerMetadata, AdminUtils => KafkaAdminUtils}
 import java.util.Properties
+
+import kafka.admin.{BrokerMetadata, AdminUtils => KafkaAdminUtils}
+import kafka.utils.{ZkUtils => KafkaZkUtils}
 import ly.stealth.mesos.kafka.interface.{AdminUtilsProxy, FeatureSupport}
+
 import scala.collection.Map
 
 
 class AdminUtils(zkUrl: String) extends AdminUtilsProxy {
+
+
   private val DEFAULT_TIMEOUT_MS = 30000
   private val zkUtils = KafkaZkUtils(zkUrl, DEFAULT_TIMEOUT_MS, DEFAULT_TIMEOUT_MS, isZkSecurityEnabled = false)
 
+  override def addPartitions(name: String, partitions: Int) =
+    KafkaAdminUtils.addPartitions(zkUtils, name, partitions)
+  
   override def fetchAllTopicConfigs(): Map[String, Properties] = KafkaAdminUtils.fetchAllTopicConfigs(zkUtils)
 
   override def createOrUpdateTopicPartitionAssignmentPathInZK(

@@ -17,20 +17,24 @@
 package ly.stealth.mesos.kafka
 
 import java.io.{File, FileWriter}
-import org.I0Itec.zkclient.{IDefaultNameSpace, ZkClient, ZkServer}
+
+import org.I0Itec.zkclient.{DataUpdater, IDefaultNameSpace, ZkClient, ZkServer}
 import org.apache.log4j.{Appender, BasicConfigurator, ConsoleAppender, Level, Logger, PatternLayout}
 import ly.stealth.mesos.kafka.Cluster.FsStorage
 import net.elodina.mesos.util.{IO, Net, Period, Version}
 import org.junit.{After, Before, Ignore}
+
 import scala.concurrent.duration.Duration
 import scala.collection.JavaConversions._
 import java.util.concurrent.atomic.AtomicBoolean
 import java.util
 import java.util.Date
+
 import ly.stealth.mesos.kafka.executor.{BrokerServer, Executor, KafkaServer, LaunchConfig}
 import ly.stealth.mesos.kafka.scheduler._
 import net.elodina.mesos.test.TestSchedulerDriver
 import org.apache.mesos.Protos.{Status, TaskState}
+import org.apache.zookeeper.CreateMode
 import org.junit.Assert._
 
 @Ignore
@@ -142,7 +146,14 @@ class KafkaMesosTestCase extends net.elodina.mesos.test.MesosTestCase {
     zkServer.start()
 
     val zkClient: ZkClient = zkServer.getZkClient
+    zkClient.setZkSerializer(ZKStringSerializer)
+
+    // we have to set the content of the node since kafka 0.10 requires this
+    // for topic updates
+    val brokerConfig =
+        """{"listener_security_protocol_map": { "PLAINTEXT": "PLAINTEXT" }, "endpoints": [ "PLAINTEXT://localhost:9005"], "jmx_port": -1, "host": "localhost", "timestamp": "1490681335158", "port": 9005, "version": 4 }"""
     zkClient.createPersistent("/brokers/ids/0", true)
+    zkClient.writeData("/brokers/ids/0", brokerConfig)
     zkClient.createPersistent("/config/changes", true)
     zkClient
   }

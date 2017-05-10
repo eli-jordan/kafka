@@ -5,6 +5,8 @@ project/*
 *.ipr
 .idea/*
 todo.txt
+classes
+prod-infra-mesos-kafka-*
 
 src/docker/.docker
 vagrant/.vagrant
@@ -14,3 +16,4 @@ kafka-mesos*.properties
 kafka-mesos*.jar
 jre*.tar.gz
 kafka*.tgz
+.DS_Store

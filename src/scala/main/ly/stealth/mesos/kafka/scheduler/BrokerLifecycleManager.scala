@@ -198,7 +198,11 @@ trait BrokerLifecycleManagerComponentImpl extends BrokerLifecycleManagerComponen
       broker.task.state = Broker.State.RUNNING
       if (status.hasData && status.getData.size() > 0)
         broker.task.endpoint = new Broker.Endpoint(status.getData.toStringUtf8)
-      broker.registerStart(broker.task.hostname)
+
+      var port: Integer = null
+      if (broker.task.endpoint != null) port = broker.task.endpoint.port
+      logger.info(s"Registering broker at ${broker.task.hostname}:${port}")
+      broker.registerStart(broker.task.hostname, port)
     }
 
     private[this] def onStopped(broker: Broker, status: TaskStatus, failed: Boolean): Unit = {

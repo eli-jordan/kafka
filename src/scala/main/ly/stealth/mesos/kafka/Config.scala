@@ -24,7 +24,7 @@ import ly.stealth.mesos.kafka.Util.BindAddress
 import net.elodina.mesos.util.{Period, Version}
 
 object SchedulerVersion {
-  val value = "0.10.1.0-SNAPSHOT"
+  val value = "0.9.5.6"
 }
 
 object Config {
@@ -87,7 +87,6 @@ object Config {
 
     if (props.containsKey("reconciliation-timeout")) reconciliationTimeout = new Period(props.getProperty("reconciliation-timeout"))
     if (props.containsKey("reconciliation-attempts")) reconciliationAttempts = Integer.valueOf("reconciliation-attempts")
-    if (props.containsKey("reconciliation-interval")) reconciliationInterval = new Period(props.getProperty("reconciliation-interval"))
 
     if (props.containsKey("jre")) jre = new File(props.getProperty("jre"))
     if (props.containsKey("log")) log = new File(props.getProperty("log"))

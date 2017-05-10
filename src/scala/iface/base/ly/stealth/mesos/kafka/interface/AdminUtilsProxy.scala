@@ -41,6 +41,8 @@ trait AdminUtilsProxy {
 
   def fetchAllEntityConfigs(entityType: String): Map[String, Properties]
 
+  def addPartitions(name: String, partitions: Int)
+  
   def assignReplicasToBrokers(ids: Seq[Int], nPartitions: Int,
     replicationFactor: Int,
     fixedStartIndex: Int = -1,

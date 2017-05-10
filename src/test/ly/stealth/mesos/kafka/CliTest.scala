@@ -330,13 +330,16 @@ class CliTest extends KafkaMesosTestCase {
   @Test
   def topic_update {
     registry.cluster.topics.addTopic("t0")
-    exec("topic update t0 --options=flush.ms=5000")
+    assertEquals(1, registry.cluster.topics.getTopic("t0").partitions.size)
+    
+    exec("topic update t0 --partitions=2 --options=flush.ms=5000")
     assertOutContains("topic updated:")
     assertOutContains("name: t0")
 
     exec("topic list")
     assertOutContains("topic:")
     assertOutContains("t0")
+    assertOutContains("partitions: 0:[0], 1:[0]")
     assertOutContains("flush.ms=5000")
   }
 

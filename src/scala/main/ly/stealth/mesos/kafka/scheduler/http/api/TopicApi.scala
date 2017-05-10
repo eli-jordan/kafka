@@ -106,7 +106,7 @@ trait TopicApiComponentImpl extends TopicApiComponent {
           options
         ))
       } else {
-        topics.map(t => cluster.topics.updateTopic(cluster.topics.getTopic(t), options))
+        topics.map(t => cluster.topics.updateTopic(cluster.topics.getTopic(t), partitions, options))
       }
       Response.ok(ListTopicsResponse(result)).build()
     }
