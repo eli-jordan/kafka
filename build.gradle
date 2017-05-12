@@ -22,7 +22,6 @@ version = new File('src/scala/main/ly/stealth/mesos/kafka/Config.scala')
 
 jar.archiveName = "kafka-mesos-${version}-kafka_$kafkaScalaVersion-${kafkaVersion.replace('_', '.')}.jar"
 
-
 repositories {
     mavenCentral()
     flatDir { dirs 'lib' }

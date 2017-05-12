@@ -68,7 +68,7 @@ trait BrokerApiComponentImpl extends BrokerApiComponent {
           Response.ok(BrokerStatusResponse(brokerNodes))
             .build()
         case Failure(e) =>
-          Response.status(Response.Status.BAD_REQUEST).build()
+          return Status.BadRequest(e.getMessage)
       }
     }
 
