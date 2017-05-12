@@ -18,17 +18,24 @@
 
 package ly.stealth.mesos.kafka.executor
 
+import java.lang.management.ManagementFactory
+import java.lang.reflect.Method
+
 import com.yammer.metrics.Metrics
 import com.yammer.metrics.core._
 import com.yammer.metrics.util.DeathRattleExceptionHandler
 import java.util
 import java.util.concurrent.{Executors, ScheduledFuture, TimeUnit}
+
 import ly.stealth.mesos.kafka.Broker
 import org.apache.log4j.Logger
+
 import scala.collection.JavaConversions._
 import scala.collection.JavaConverters._
 import scala.collection.mutable
+import scala.util.Try
 import scala.util.control.NonFatal
+import java.lang.{Long => JLong}
 
 class MetricCollectorProxy(loader: ClassLoader, server: AnyRef, send: Broker.Metrics => Unit) {
   private[this] val executorService = Executors.newScheduledThreadPool(1)
@@ -148,7 +155,44 @@ object MetricCollectorProxy {
         )
       })
 
-      baseVmMetrics ++ bufferPoolMetrics ++ gcMetrics
+
+      baseVmMetrics ++ bufferPoolMetrics ++ gcMetrics ++ fileDescriptorMetrics
+    }
+
+    /**
+     * Collects metrics on the number of open file descriptors associated with the JVM
+     */
+    def fileDescriptorMetrics: Map[String, Number] = {
+      val os = ManagementFactory.getOperatingSystemMXBean
+
+      val openFileDescriptors: Try[JLong] = {
+        Try {
+          val getOpenFileDescriptorCount = os.getClass.getDeclaredMethod("getOpenFileDescriptorCount")
+          getOpenFileDescriptorCount.setAccessible(true)
+          getOpenFileDescriptorCount.invoke(os).asInstanceOf[JLong]
+        }
+      }
+
+      val maxFileDescriptors: Try[JLong] = {
+        Try {
+          val getMaxFileDescriptorCount = os.getClass.getDeclaredMethod("getMaxFileDescriptorCount")
+          getMaxFileDescriptorCount.setAccessible(true)
+          getMaxFileDescriptorCount.invoke(os).asInstanceOf[JLong]
+        }
+      }
+
+      val result = for {
+        open <- openFileDescriptors
+        max <- maxFileDescriptors
+      } yield {
+        Map[String, Number](
+          "vm,fd,limit" -> open,
+          "vm,fd,openCount" -> max,
+          "vm,fd,usage" -> open.doubleValue() / max.doubleValue()
+        )
+      }
+
+      result.getOrElse(Map.empty)
     }
 
     private def collectApacheMetrics: Map[String, Number] = {
